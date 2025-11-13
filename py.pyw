@@ -484,7 +484,7 @@ class OptimizationWorker(QThread):
 class OptimizadorTHO(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("THO OPTIMIZER 2.0 - PROFESSIONAL")
+        self.setWindowTitle("THO OPTIMIZER 3.0 - PROFESSIONAL")
         self.setFixedSize(1200, 800)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowSystemMenuHint)
         
@@ -523,7 +523,7 @@ class OptimizadorTHO(QMainWindow):
         title_layout = QHBoxLayout(title_bar)
         title_layout.setContentsMargins(15, 0, 15, 0)
         
-        title_label = QLabel("⚡ THO OPTIMIZER 2.0 PROFESSIONAL ⚡")
+        title_label = QLabel("⚡ THO OPTIMIZER 3.0 PROFESSIONAL ⚡")
         title_label.setStyleSheet("""
             color: #2ecc71; 
             font-size: 18px; 
@@ -642,7 +642,7 @@ class OptimizadorTHO(QMainWindow):
         buttons_layout.addWidget(titulo)
         
         # Botón OPTIMIZAR
-        self.btn_optimizar = QPushButton("⚡ OPTIMIZAR AL MÁXIMO")
+        self.btn_optimizar = QPushButton("⚡ OPTIMIZAR")
         self.btn_optimizar.setFixedSize(350, 100)
         self.btn_optimizar.setStyleSheet("""
             QPushButton {
@@ -789,7 +789,7 @@ class OptimizadorTHO(QMainWindow):
         credits_layout.setAlignment(Qt.AlignCenter)
         
         # Título
-        titulo = QLabel("THO OPTIMIZER 2.0")
+        titulo = QLabel("THO OPTIMIZER 3.0")
         titulo.setStyleSheet("""
             color: #2ecc71; 
             font-size: 52px; 
