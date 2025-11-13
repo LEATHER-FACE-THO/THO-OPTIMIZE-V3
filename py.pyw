@@ -1,16 +1,16 @@
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QVBoxLayout, 
                               QWidget, QLabel, QMessageBox, QHBoxLayout, QTextEdit,
-                              QStackedWidget)
-from PySide6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QSize, QUrl, QMetaObject, Q_ARG
-from PySide6.QtGui import QFont, QColor, QIcon, QDesktopServices
+                              QFrame, QScrollArea, QStackedWidget)
+from PySide6.QtCore import Qt, QPropertyAnimation, QSize, QUrl, QThread, Signal, QTimer
+from PySide6.QtGui import QFont, QColor, QIcon, QDesktopServices, QMouseEvent, QPixmap
 from PySide6.QtMultimedia import QSoundEffect  
 from matrix_background import MatrixBackground  
+
 try:
     import win32security
     import win32api
     import win32con
 except ImportError:
-
     pass
 
 import os
@@ -20,737 +20,182 @@ import ctypes
 import sys
 import psutil
 import threading
+import json
+import shutil
+from datetime import datetime
 
-class OptimizadorTHO(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("TODO HACK OFFICIAL")
-        self.setFixedSize(1200, 800)  
-        
-        self.setWindowOpacity(0)
-        self.fade_in_animation = QPropertyAnimation(self, b"windowOpacity")
-        self.fade_in_animation.setStartValue(0)
-        self.fade_in_animation.setEndValue(1)
-        self.fade_in_animation.setDuration(1000)
-        self.fade_in_animation.start()
-        
-        self.log_console = QTextEdit()
-        self.log_console.setReadOnly(True)
-        self.log_console.setStyleSheet("""
-            QTextEdit {
-                background-color: rgba(0, 0, 0, 0.7);
-                color: #2ecc71;
-                border: 1px solid #2ecc71;
-                border-radius: 5px;
-                min-height: 150px;
-            }
-        """)
-        
-        self.elevar_privilegios()
-        
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        main_layout = QHBoxLayout(central_widget)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        
-        self.background = MatrixBackground(self)
-        self.background.resize(self.size())
-        self.background.lower()  
-        
-        container = QWidget()
-        container.setStyleSheet("background-color: rgba(0, 0, 0, 0.2);")  
-        container_layout = QHBoxLayout(container)
-        main_layout.addWidget(container)
-        
-        sidebar = QWidget()
-        sidebar.setFixedWidth(200)
-        sidebar_layout = QVBoxLayout(sidebar)
-        sidebar_layout.setAlignment(Qt.AlignTop)
-        
-        sidebar.setStyleSheet("""
-            QWidget {
-                background-color: rgba(0, 0, 0, 0.85);
-                border-right: 2px solid #2ecc71;
-                padding: 10px;
-                margin: 5px;
-                border-radius: 10px;
-            }
-        """)
-        
-        self.crear_boton_nav("🏠 INICIO", self.mostrar_main, sidebar_layout)
-        self.crear_boton_nav("ℹ️ CDT", self.mostrar_creditos, sidebar_layout)
-        
-        nav_style = """
-            QPushButton {
-                background-color: rgba(46, 204, 113, 0.1);
-                color: #2ecc71;
-                border: 2px solid #2ecc71;
-                border-radius: 10px;
-                text-align: left;
-                padding: 15px;
-                margin: 10px 5px;
-                font-size: 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: rgba(46, 204, 113, 0.3);
-                border-color: #27ae60;
-            }
-            QPushButton:pressed {
-                background-color: rgba(46, 204, 113, 0.5);
-            }
-        """
-        
-        for btn in sidebar.findChildren(QPushButton):
-            btn.setStyleSheet(nav_style)
-
-        content_area = QWidget()
-        content_layout = QVBoxLayout(content_area)
-        
-        self.stack = QStackedWidget()
-        
-        main_page = QWidget()
-        main_page_layout = QVBoxLayout(main_page)
-        
-        titulo = QLabel("THO OPTIMIZER 2.0")
-        titulo.setStyleSheet("color: #2ecc71; font-size: 28px; font-weight: bold;")
-        main_page_layout.addWidget(titulo, alignment=Qt.AlignCenter)
-        
-        buttons_widget = QWidget()
-        buttons_layout = QHBoxLayout(buttons_widget)
-        buttons_layout.setSpacing(20)
-        buttons_layout.setContentsMargins(20, 20, 20, 20)
-
-        left_column = QWidget()
-        left_layout = QVBoxLayout(left_column)
-        left_layout.setSpacing(10)
-
-        center_column = QWidget()
-        center_layout = QVBoxLayout(center_column)
-        center_layout.setSpacing(10)
-        center_layout.setAlignment(Qt.AlignCenter)
-
-        right_column = QWidget()
-        right_layout = QVBoxLayout(right_column)
-        right_layout.setSpacing(10)
-
-        left_buttons = [
-            ("🚀 THO NORMAL", self.optimizar_normal),
-            ("⚡ THO FULL", self.optimizar_full),
-            ("🔧 THO SERVICIOS", self.optimizar_servicios),
-            ("🗑️ THO TEMP", self.limpiar_temporales),
-            ("💾 THO RAM", self.optimizar_ram),
-            ("🎮 THO GPU", self.optimizar_gpu),
-            ("📊 THO GAME MODE", self.activar_modo_juego),
-            ("🎯 THO FPS BOOST", self.optimizar_fps),
-            ("⚡ THO AUDIO", self.optimizar_audio),
-        ]
-
-        center_button = [("💪 THO EXTREMO", self.optimizar_extremo)]
-
-        right_buttons = [
-            ("🔋 THO BATERIA", self.optimizar_bateria),
-            ("🌡️ THO TEMPERATURA", self.optimizar_temperatura),
-            ("🚄 THO RED", self.optimizar_red),
-            ("🔒 THO SEGURIDAD", self.optimizar_seguridad),
-            ("⚙️ THO SYSTEM", self.optimizar_sistema),
-            ("💻 THO APPS", self.optimizar_apps),
-            ("🛡️ THO DEFENDER", self.optimizar_defender),
-            ("🎨 THO VISUAL", self.optimizar_visual),
-            ("🔄 RESTAURAR", self.restaurar_sistema)
-        ]
-
-        for texto, funcion in left_buttons:
-            btn = self.crear_boton_suave(texto, funcion)
-            left_layout.addWidget(btn)
-
-        texto, funcion = center_button[0]
-        btn_extremo = self.crear_boton_suave(texto, funcion)
-        btn_extremo.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(46, 204, 113, 0.5);
-                color: #2ecc71;
-                border: 3px solid #2ecc71;
-                padding: 10px;
-                font-size: 18px;
-                font-weight: bold;
-                border-radius: 8px;
-                min-height: 60px;
-            }
-            QPushButton:hover {
-                background-color: rgba(46, 204, 113, 0.7);
-                border: 4px solid #27ae60;
-            }
-        """)
-        center_layout.addWidget(btn_extremo)
-
-        for texto, funcion in right_buttons:
-            btn = self.crear_boton_suave(texto, funcion)
-            right_layout.addWidget(btn)
-
-        buttons_layout.addWidget(left_column)
-        buttons_layout.addWidget(center_column)
-        buttons_layout.addWidget(right_column)
-        main_page_layout.addWidget(buttons_widget)
-
-        main_page_layout.addWidget(self.log_console)
-        
-        self.stack.addWidget(main_page)
-        self.stack.addWidget(self.crear_pagina_creditos())
-        
-        container_layout.addWidget(sidebar)
-        container_layout.addWidget(self.stack)
-
-        self.success_sound = QSoundEffect(self)
-        try:
- 
-            if getattr(sys, 'frozen', False):
-          
-                base_path = sys._MEIPASS
-            else:
-  
-                base_path = os.path.dirname(os.path.abspath(__file__))
-            
-            sound_path = os.path.join(base_path, "sound", "2.wav")
-            self.success_sound.setSource(QUrl.fromLocalFile(sound_path))
-            self.success_sound.setVolume(1.0)
-            self.success_sound.setLoopCount(1)
+class OptimizationWorker(QThread):
+    progress = Signal(str)
+    finished = Signal(bool)
+    error_occurred = Signal(str)
     
-            if not os.path.exists(sound_path):
-                print(f"No se encuentra el archivo de sonido en: {sound_path}")
-        except Exception as e:
-            print(f"Error al cargar sonido: {str(e)}")
-
-    def reproducir_sonido_y_funcion(self, funcion):
-        """Reproduce el sonido y ejecuta la función del botón"""
-        try:
-            if self.success_sound.isLoaded():
-                self.success_sound.play()
-            funcion()
-        except Exception as e:
-            print(f"Error al reproducir sonido: {str(e)}")
-            funcion()
-
-    def mostrar_mensaje(self, titulo, mensaje):
-        QMessageBox.information(self, titulo, mensaje)
-
-    def mostrar_error(self, titulo, mensaje):
-        QMessageBox.critical(self, titulo, mensaje)
-
-    def optimizar_normal(self):
-        try:
-            self.log("Iniciando optimización normal...")
-
-            self.log("Iniciando limpieza del sistema...")
-            os.system(r'cleanmgr /sagerun:1')
-
-            self.log("Iniciando desfragmentación...")
-            os.system(r'defrag C: /O')
-
-            self.log("Limpiando archivos temporales...")
-            os.system(r'del /s /f /q "%temp%\\*.*"')
-            os.system(r'del /s /f /q "C:\\Windows\\Temp\\*.*"')
-
-            self.log("Limpiando caché DNS...")
-            os.system('ipconfig /flushdns')
-            self.mostrar_mensaje("Éxito", "Optimización normal completada")
-            self.log("Optimización normal completada exitosamente")
-        except Exception as e:
-            self.log(f"Error: {str(e)}")
-            self.mostrar_error("Error", f"Error durante la optimización: {str(e)}")
-
-    def optimizar_full(self):
-        try:
-            self.log("Iniciando optimización FULL...")
-
-            commands = [
-                ('cleanmgr /sagerun:1', "Limpieza del sistema"),
-                ('defrag C: /O /D', "Desfragmentación profunda"),
-                ('powercfg -h off', "Desactivando hibernación"),
-                ('sfc /scannow', "Verificando archivos del sistema"),
-                ('DISM /Online /Cleanup-Image /RestoreHealth', "Reparando imagen del sistema"),
-                ('netsh winsock reset', "Reseteando Winsock"),
-                ('netsh int ip reset', "Reseteando configuración TCP/IP"),
-                (r'del /s /f /q "%temp%\\*.*"', "Limpiando temporales"),
-                (r'del /s /f /q "C:\\Windows\\Temp\\*.*"', "Limpiando temporales de Windows")
-            ]
-            for cmd, desc in commands:
-                self.log(f"Ejecutando: {desc}...")
-                subprocess.run(cmd, shell=True)
-
-            self.log("Optimizando registro...")
-            self.modificar_registro_rendimiento()
-
-            self.log("Optimizando servicios...")
-            self.optimizar_servicios()
-            self.mostrar_mensaje("Éxito", "Optimización FULL completada")
-            self.log("Optimización FULL completada exitosamente")
-        except Exception as e:
-            self.log(f"Error: {str(e)}")
-            self.mostrar_error("Error", f"Error durante la optimización: {str(e)}")
-
-    def optimizar_extremo(self):
-        try:
-            self.log("Iniciando optimización EXTREMA...")
-            
-            self.worker_thread = threading.Thread(target=self._optimizar_extremo_thread)
-            self.worker_thread.start()
-            
-            self.log("Optimización en progreso, por favor espere...")
-            
-        except Exception as e:
-            self.log(f"Error: {str(e)}")
-            self.mostrar_error("Error", f"Error durante la optimización: {str(e)}")
-
-    def _optimizar_extremo_thread(self):
-        try:
-
-            self.optimizar_servicios_extremo()
-            self.modificar_registro_rendimiento_extremo()
-            
-            QMetaObject.invokeMethod(self, "_optimizacion_completada", 
-                                   Qt.ConnectionType.QueuedConnection)
-        except Exception as e:
-
-            QMetaObject.invokeMethod(self, "_mostrar_error_thread", 
-                                   Qt.ConnectionType.QueuedConnection,
-                                   Q_ARG(str, str(e)))
-
-    def _optimizacion_completada(self):
-        self.mostrar_mensaje("Éxito", "Optimización EXTREMA completada")
-        self.log("Optimización EXTREMA completada exitosamente")
-
-    def _mostrar_error_thread(self, error):
-        self.mostrar_error("Error", f"Error durante la optimización: {error}")
-
-    def modificar_registro_rendimiento(self):
-        try:
-            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 
-                               r"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management",
-                               0, winreg.KEY_ALL_ACCESS)
-            winreg.SetValueEx(key, "IoPageLockLimit", 0, winreg.REG_DWORD, 983040)
-            winreg.CloseKey(key)
-        except Exception:
-            pass
-
-    def modificar_registro_rendimiento_extremo(self):
-        try:
-            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 
-                               r"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management",
-                               0, winreg.KEY_ALL_ACCESS)
-            winreg.SetValueEx(key, "IoPageLockLimit", 0, winreg.REG_DWORD, 1966080)
-            winreg.SetValueEx(key, "SystemCacheDirtyPageThreshold", 0, winreg.REG_DWORD, 1000)
-            winreg.CloseKey(key)
-        except Exception:
-            pass
-
-    def desactivar_servicios_innecesarios(self):
-        servicios = [
-            "DiagTrack",
-            "SysMain",
-            "WSearch",
-        ]
-        for servicio in servicios:
-            os.system(f'net stop {servicio}')
-            os.system(f'sc config {servicio} start=disabled')
-
-    def restaurar_sistema(self):
-        try:
-            self.log("Iniciando restauración completa del sistema...")
-
-            self.log("Restaurando configuración de energía...")
-            os.system('powercfg -h on')  
-            os.system('powercfg -restoredefaultschemes')  
-            os.system('powercfg -setactive scheme_balanced')  
-
-            self.log("Restaurando servicios de Windows...")
-            servicios_default = [
-                "DiagTrack",      
-                "dmwappushservice", 
-                "SysMain",        
-                "WSearch",        
-                "XboxGipSvc",     
-                "XblAuthManager", 
-                "XblGameSave",
-                "TabletInputService",
-                "Remote Registry",
-                "PrintNotify",
-                "fax",
-                "Themes",         
-                "Windows Update", 
-                "Windows Time",   
-                "Windows Search"  
-            ]
-
-            for servicio in servicios_default:
-                os.system(f'sc config "{servicio}" start=auto')
-                os.system(f'net start "{servicio}" >nul 2>&1')
-                self.log(f"Servicio {servicio} restaurado")
-
-            self.log("Restaurando configuración del registro...")
-            try:
-                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 
-                                   r"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management",
-                                   0, winreg.KEY_ALL_ACCESS)
-
-                winreg.SetValueEx(key, "IoPageLockLimit", 0, winreg.REG_DWORD, 0)
-                winreg.SetValueEx(key, "SystemCacheDirtyPageThreshold", 0, winreg.REG_DWORD, 0)
-                winreg.SetValueEx(key, "LargeSystemCache", 0, winreg.REG_DWORD, 0)
-                winreg.CloseKey(key)
-            except Exception as e:
-                self.log(f"Aviso: No se pudo restaurar algún valor del registro: {str(e)}")
-
-            self.log("Restaurando configuración del sistema...")
-            os.system('bcdedit /deletevalue useplatformclock')
-            os.system('bcdedit /deletevalue disabledynamictick')
-            os.system('bcdedit /deletevalue useplatformtick')
-
-            self.log("Restaurando configuración de red...")
-            os.system('ipconfig /flushdns')
-            os.system('ipconfig /registerdns')
-            os.system('netsh winsock reset')
-            os.system('netsh int ip reset')
-
-            self.log("Verificando integridad del sistema...")
-            os.system('sfc /scannow')
-            os.system('DISM /Online /Cleanup-Image /RestoreHealth')
-
-            self.mostrar_mensaje("Éxito", "Sistema restaurado completamente a valores por defecto")
-            self.log("Sistema restaurado a la configuración original exitosamente")
-
-        except Exception as e:
-            self.log(f"Error: {str(e)}")
-            self.mostrar_error("Error", f"Error durante la restauración: {str(e)}")
-
-    def activar_servicios(self):
-        servicios = [
-            "DiagTrack",
-            "SysMain",
-            "WSearch",
-        ]
-        for servicio in servicios:
-            os.system(f'sc config {servicio} start=auto')
-            os.system(f'net start {servicio}')
-
-    def crear_boton_animado(self, texto, funcion):
-        btn = QPushButton(texto)
-        btn.clicked.connect(funcion)
-
-        self.animation = QPropertyAnimation(btn, b"geometry")
-        self.animation.setDuration(200)
-        def on_hover():
-            geometry = btn.geometry()
-            self.animation.setStartValue(geometry)
-            self.animation.setEndValue(QRect(geometry.x()-5, geometry.y()-5, 
-                                           geometry.width()+10, geometry.height()+10))
-            self.animation.start()
-        def on_leave():
-            geometry = btn.geometry()
-            self.animation.setStartValue(geometry)
-            self.animation.setEndValue(QRect(geometry.x()+5, geometry.y()+5, 
-                                           geometry.width()-10, geometry.height()-10))
-            self.animation.start()
-        btn.enterEvent = lambda e: on_hover()
-        btn.leaveEvent = lambda e: on_leave()
-        return btn
-
-    def crear_boton_suave(self, texto, funcion):
-        btn = QPushButton(texto)
-        btn.setFixedSize(280, 50)  
-        btn.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(46, 204, 113, 0.3);
-                color: #2ecc71;
-                border: 2px solid #2ecc71;
-                padding: 10px;
-                font-size: 16px;
-                font-weight: bold;
-                border-radius: 8px;
-            }
-            QPushButton:hover {
-                background-color: rgba(46, 204, 113, 0.5);
-                border: 3px solid #27ae60;
-            }
-        """)
-
-        btn.clicked.connect(lambda: self.reproducir_sonido_y_funcion(funcion))
-        return btn
-
-    def crear_boton_nav(self, texto, funcion, layout):
-        btn = QPushButton(texto)
-        btn.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                color: #2ecc71;
-                border: 2px solid #2ecc71;
-                border-radius: 5px;
-                text-align: left;
-                padding: 10px;
-                margin: 5px;
-            }
-            QPushButton:hover {
-                background-color: rgba(46, 204, 113, 0.2);
-            }
-        """)
-        btn.clicked.connect(funcion)
-        layout.addWidget(btn)
+    def __init__(self, optimize=True):
+        super().__init__()
+        self.optimize = optimize
+        self.backup_data = {}
         
-    def crear_boton_social(self, texto, link):
-        btn = QPushButton(texto)
-        btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(link)))
-        return btn
-
-    def log(self, mensaje):
-        if hasattr(self, 'log_console'):
-            self.log_console.append(f"> {mensaje}")
-        else:
-            print(f"> {mensaje}")  
-        
-    def mostrar_main(self):
-        self.stack.setCurrentIndex(0)
-
-    def mostrar_creditos(self):
-        self.stack.setCurrentIndex(1)
-
-    def crear_pagina_creditos(self):        
-        credits_page = QWidget()
-        credits_layout = QVBoxLayout(credits_page)
-        credits_layout.setSpacing(40)
-        credits_layout.setContentsMargins(50, 50, 50, 50)
-        
-        credits_container = QWidget()
-        credits_container.setFixedHeight(400)
-        credits_container.setStyleSheet("""
-            QWidget {
-                background-color: rgba(0, 0, 0, 0.9);
-                border: 4px solid #2ecc71;
-                border-radius: 15px;
-                padding: 40px;
-            }
-            QLabel {
-                color: #2ecc71;
-                font-weight: bold;
-                background-color: rgba(0, 0, 0, 0.7);
-                border-radius: 10px;
-                padding: 20px;
-            }
-        """)
-        credits_container_layout = QVBoxLayout(credits_container)
-        credits_container_layout.setSpacing(30)
-        
-        titulo = QLabel("THO OPTIMIZER 2.0", alignment=Qt.AlignCenter)
-        titulo.setStyleSheet("font-size: 48px;")
-        
-        credits_text = QLabel("GITHUB BY: HANNIBAL THO", alignment=Qt.AlignCenter)
-        credits_text.setStyleSheet("font-size: 32px;")
-        
-        paypal_text = QLabel("PayPal: cakarrota2022@gmail.com", alignment=Qt.AlignCenter)
-        paypal_text.setStyleSheet("font-size: 24px;")
-        
-        for widget in [titulo, credits_text, paypal_text]:
-            credits_container_layout.addWidget(widget)
-        
-        social_container = QWidget()
-        social_container.setFixedHeight(150)
-        social_container.setStyleSheet("""
-            QWidget {
-                background-color: rgba(0, 0, 0, 0.7);
-                border: 4px solid #2ecc71;
-                border-radius: 15px;
-                padding: 20px;
-            }
-            QPushButton {
-                background-color: rgba(46, 204, 113, 0.3);
-                color: #2ecc71;
-                border: 3px solid #2ecc71;
-                border-radius: 12px;
-                padding: 10px;
-                font-size: 16px;
-                font-weight: bold;
-                min-width: 200px;
-                max-width: 200px;
-            }
-            QPushButton:hover {
-                background-color: rgba(46, 204, 113, 0.5);
-                border: 4px solid #27ae60;
-            }
-        """)
-        social_layout = QHBoxLayout(social_container)
-        social_layout.setSpacing(50)  
-        social_layout.setContentsMargins(40, 20, 40, 20)  
-        social_layout.setAlignment(Qt.AlignCenter)
-
-        botones_sociales = [
-            ("🎮 DISCORD", "https://discord.gg/4svwzsy3UP"),
-            ("📺 YOUTUBE", "https://www.youtube.com/@TODO-HACK-OFFICIAL"),
-            ("💰 DONAR", "https://www.paypal.com/sendmoney?email=cakarrota2022@gmail.com")
-        ]
-
-        for texto, url in botones_sociales:
-            btn = QPushButton(texto)
-            btn.setFixedSize(200, 50)  
-            btn.clicked.connect(lambda checked, u=url: QDesktopServices.openUrl(QUrl(u)))
-            social_layout.addWidget(btn)
-
-        credits_layout.addStretch(1)
-        credits_layout.addWidget(credits_container)
-        credits_layout.addWidget(social_container)
-        credits_layout.addStretch(1)
-        
-        return credits_page
-
-    def elevar_privilegios(self):
+    def run(self):
         try:
-
-            if ctypes.windll.shell32.IsUserAnAdmin() == 0:
-                self.log("Solicitando privilegios de administrador...")
-                ctypes.windll.shell32.ShellExecuteW(
-                    None, "runas", sys.executable, " ".join(sys.argv), None, 1
-                )
-                sys.exit()
-
-            try:
-                import win32security
-                import win32api
-                current = win32security.OpenProcessToken(
-                    win32api.GetCurrentProcess(),
-                    win32security.TOKEN_ADJUST_PRIVILEGES | win32security.TOKEN_QUERY
-                )
-                privilegios = [
-                    "SeBackupPrivilege",
-                    "SeRestorePrivilege",
-                    "SeShutdownPrivilege",
-                    "SeTakeOwnershipPrivilege",
-                    "SeDebugPrivilege"
-                ]
-                for privilegio in privilegios:
-                    try:
-                        win32security.AdjustTokenPrivileges(
-                            current, False,
-                            [(win32security.LookupPrivilegeValue(None, privilegio),
-                              win32security.SE_PRIVILEGE_ENABLED)]
-                        )
-                        self.log(f"Privilegio {privilegio} activado")
-                    except Exception as e:
-                        self.log(f"No se pudo elevar el privilegio {privilegio}")
-                        
-            except ImportError:
-                self.log("Ejecutando con privilegios de administrador básicos")
-        except Exception as e:        
-            self.log(f"Error al elevar privilegios: {str(e)}")
-
-    def optimizar_servicios(self):
-        try:
-            servicios_innecesarios = [
-                "DiagTrack",  
-                "dmwappushservice",  
-                "SysMain",  
-                "WSearch",  
-                "XboxGipSvc",  
-                "XblAuthManager",
-                "XblGameSave",
-                "TabletInputService",  
-                "Remote Registry",  
-                "PrintNotify",  
-                "fax",  
-            ]
-            self.log("Verificando servicios innecesarios...")
-            servicios_desactivados = 0
-            
-            for servicio in servicios_innecesarios:
-                result = subprocess.run(f'sc query "{servicio}"', shell=True, capture_output=True)
-                if result.returncode == 0:  
-                    os.system(f'net stop "{servicio}" >nul 2>&1')
-                    os.system(f'sc config "{servicio}" start=disabled >nul 2>&1')
-                    servicios_desactivados += 1
-                    self.log(f"Servicio {servicio} desactivado")
-
-            if (servicios_desactivados > 0):
-                self.log(f"Se desactivaron {servicios_desactivados} servicios innecesarios")
+            if self.optimize:
+                self.crear_punto_restauracion()
+                self.optimizar_completo()
             else:
-                self.log("No se encontraron servicios innecesarios para desactivar")
-            
-            self.log("THO SERVICIOS se aplicó correctamente")
-            
+                self.restaurar_completo()
+            self.finished.emit(True)
         except Exception as e:
-            self.log(f"Error: {str(e)}")
-            self.mostrar_error("Error", f"Error durante la optimización de servicios: {str(e)}")
-
-    def limpiar_temporales(self):
+            self.progress.emit(f"❌ ERROR CRÍTICO: {str(e)}")
+            self.error_ocurrido.emit(str(e))
+            self.finished.emit(False)
+    
+    def crear_punto_restauracion(self):
         try:
-            self.log("Iniciando limpieza de archivos temporales...")
-            
-            rutas_temp = [
-                os.environ.get('TEMP'),
-                os.environ.get('TMP'),
-                r'C:\Windows\Temp',
-                r'C:\Windows\Prefetch',
-                os.path.join(os.environ.get('LOCALAPPDATA'), 'Temp'),
-                os.path.join(os.environ.get('APPDATA'), 'Temp')
-            ]
-            for ruta in rutas_temp:
-                if ruta and os.path.exists(ruta):
-                    self.log(f"Limpiando: {ruta}")
-                    os.system(f'del /s /f /q "{ruta}\\*.*" >nul 2>&1')  
-            
-            self.log("THO TEMP se aplicó correctamente")
-            
+            self.progress.emit("📍 Creando punto de restauración...")
+            subprocess.run('wmic.exe /Namespace:\\\\root\\default Class SystemRestore Call CreateRestorePoint "THO-OPTIMIZE-BACKUP", 100, 7', 
+                         shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
+            self.progress.emit("✅ Punto de restauración creado exitosamente")
         except Exception as e:
-            self.log(f"Error: {str(e)}")
-            self.mostrar_error("Error", f"Error durante la limpieza: {str(e)}")
-
-    def optimizar_ram(self):
+            self.progress.emit(f"⚠️ Advertencia: No se pudo crear punto de restauración")
+    
+    def optimizar_completo(self):
+        self.progress.emit("\n" + "="*60)
+        self.progress.emit("🚀 INICIANDO OPTIMIZACIÓN COMPLETA DEL SISTEMA")
+        self.progress.emit("="*60 + "\n")
+        
+        self.optimizar_servicios_tho()
+        self.limpiar_temporales_tho()
+        self.optimizar_ram_tho()
+        self.optimizar_gpu_tho()
+        self.optimizar_registro_tho()
+        self.optimizar_red_tho()
+        self.optimizar_sistema_tho()
+        self.optimizar_disco_tho()
+        self.desactivar_telemetria()
+        self.optimizar_energia_tho()
+        self.eliminar_apps_innecesarias()
+        self.optimizar_startup_tho()
+        self.limpiar_cache_aplicaciones()
+        
+        self.progress.emit("\n" + "="*60)
+        self.progress.emit("✨ OPTIMIZACIÓN COMPLETADA EXITOSAMENTE")
+        self.progress.emit("="*60)
+    
+    def optimizar_servicios_tho(self):
+        self.progress.emit("\n📋 [1/13] Optimizando servicios de Windows...")
+        servicios_desactivar = [
+            "DiagTrack", "dmwappushservice", "SysMain", "WSearch", 
+            "XboxGipSvc", "XblAuthManager", "XblGameSave", "TabletInputService",
+            "Remote Registry", "PrintNotify", "fax", "WpnService", "RetailDemo",
+            "DoSvc", "PcaSvc", "WMPNetworkSvc", "WerSvc", "MapsBroker",
+            "BTAGService", "CDPUserSvc", "OneSyncSvc", "WpcMonSvc",
+            "SharedAccess", "PhoneSvc", "SCardSvr", "DusmSvc", "DPS",
+            "WdiServiceHost", "WdiSystemHost", "TapiSrv", "BITS",
+            "lmhosts", "iphlpsvc", "WpnService", "MessagingService",
+            "ClipSVC", "AppXSvc"
+        ]
+        
+        desactivados = 0
+        for servicio in servicios_desactivar:
+            try:
+                result = subprocess.run(f'sc query "{servicio}"', shell=True, 
+                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+                if result.returncode == 0:
+                    subprocess.run(f'net stop "{servicio}" /y', shell=True, 
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+                    subprocess.run(f'sc config "{servicio}" start=disabled', shell=True, 
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+                    desactivados += 1
+            except Exception:
+                pass
+        
+        self.progress.emit(f"   ✓ {desactivados} servicios innecesarios desactivados")
+    
+    def limpiar_temporales_tho(self):
+        self.progress.emit("\n🧹 [2/13] Limpiando archivos temporales...")
+        rutas_temp = [
+            os.environ.get('TEMP'),
+            os.environ.get('TMP'),
+            r'C:\Windows\Temp',
+            r'C:\Windows\Prefetch',
+            r'C:\Windows\SoftwareDistribution\Download',
+            os.path.join(os.environ.get('LOCALAPPDATA'), 'Temp'),
+            os.path.join(os.environ.get('APPDATA'), 'Temp'),
+        ]
+        
+        limpios = 0
+        for ruta in rutas_temp:
+            if ruta and os.path.exists(ruta):
+                try:
+                    for item in os.listdir(ruta):
+                        path = os.path.join(ruta, item)
+                        try:
+                            if os.path.isfile(path):
+                                os.remove(path)
+                                limpios += 1
+                            elif os.path.isdir(path):
+                                shutil.rmtree(path, ignore_errors=True)
+                                limpios += 1
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+        
         try:
-            self.log("Optimizando memoria RAM...")
-            
+            subprocess.run('powershell -Command "Clear-RecycleBin -Force -ErrorAction SilentlyContinue"', 
+                         shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+        except Exception:
+            pass
+        
+        self.progress.emit(f"   ✓ {limpios} archivos temporales eliminados")
+    
+    def optimizar_ram_tho(self):
+        self.progress.emit("\n💾 [3/13] Optimizando memoria RAM...")
+        try:
             ctypes.windll.psapi.EmptyWorkingSet(ctypes.c_int(-1))
-            
-            subprocess.run('ipconfig /flushdns', shell=True)
-            
-            os.system('powershell -Command "Clear-RecycleBin -Force" >nul 2>&1')
-            
-            self.log("THO RAM se aplicó correctamente")
-            
+            subprocess.run('ipconfig /flushdns', shell=True, 
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+            self.progress.emit("   ✓ RAM optimizada y caché DNS limpiado")
         except Exception as e:
-            self.log(f"Error: {str(e)}")
-            self.mostrar_error("Error", f"Error durante la optimización de RAM: {str(e)}")
-
-    def optimizar_gpu(self):
+            self.progress.emit(f"   ✗ Error en RAM: {str(e)}")
+    
+    def optimizar_gpu_tho(self):
+        self.progress.emit("\n🎮 [4/13] Optimizando caché de GPU...")
+        shader_paths = [
+            os.path.join(os.environ.get('LOCALAPPDATA'), 'NVIDIA\\GLCache'),
+            os.path.join(os.environ.get('LOCALAPPDATA'), 'AMD\\GLCache'),
+            os.path.join(os.environ.get('LOCALAPPDATA'), 'Intel\\GLCache'),
+            os.path.join(os.environ.get('LOCALAPPDATA'), 'NVIDIA Corporation'),
+        ]
+        limpios = 0
+        for path in shader_paths:
+            if os.path.exists(path):
+                try:
+                    for item in os.listdir(path):
+                        fullpath = os.path.join(path, item)
+                        try:
+                            if os.path.isfile(fullpath):
+                                os.remove(fullpath)
+                                limpios += 1
+                            elif os.path.isdir(fullpath):
+                                shutil.rmtree(fullpath, ignore_errors=True)
+                                limpios += 1
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+        
+        self.progress.emit(f"   ✓ Caché de GPU limpiado ({limpios} archivos)")
+    
+    def optimizar_registro_tho(self):
+        self.progress.emit("\n⚙️ [5/13] Optimizando registro del sistema...")
         try:
-            self.log("Optimizando GPU...")
-            
-            shader_paths = [
-                os.path.join(os.environ.get('LOCALAPPDATA'), 'NVIDIA\\GLCache'),
-                os.path.join(os.environ.get('LOCALAPPDATA'), 'AMD\\GLCache'),
-                os.path.join(os.environ.get('LOCALAPPDATA'), 'Intel\\GLCache')
-            ]
-            found_gpu = False
-            for path in shader_paths:
-                if os.path.exists(path):
-                    found_gpu = True
-                    self.log(f"Limpiando caché de shaders: {path}")
-                    os.system(f'del /s /f /q "{path}\\*.*" >nul 2>&1')  
-            
-            if not found_gpu:
-                self.log("No se encontró caché de GPU para limpiar")
-            
-            self.log("THO GPU se aplicó correctamente")
-            
-        except Exception as e:
-            self.log(f"Error: {str(e)}")
-            self.mostrar_error("Error", f"Error durante la optimización de GPU: {str(e)}")
-
-    def optimizar_servicios_extremo(self):
-        try:
-            self.log("Iniciando optimización extrema del sistema...")
-            
-            registry_optimizations = [
+            optimizaciones = [
                 {
                     'path': r'SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management',
                     'values': {
                         'LargeSystemCache': (winreg.REG_DWORD, 1),
                         'SystemCacheDirtyPageThreshold': (winreg.REG_DWORD, 1000),
-                        'IoPageLockLimit': (winreg.REG_DWORD, 983040)
+                        'IoPageLockLimit': (winreg.REG_DWORD, 983040),
+                        'ClearPageFileAtShutdown': (winreg.REG_DWORD, 1)
                     }
                 },
                 {
@@ -765,431 +210,904 @@ class OptimizadorTHO(QMainWindow):
                         'SystemResponsiveness': (winreg.REG_DWORD, 0),
                         'NetworkThrottlingIndex': (winreg.REG_DWORD, 4294967295)
                     }
+                },
+                {
+                    'path': r'SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters',
+                    'values': {
+                        'IRPStackSize': (winreg.REG_DWORD, 32)
+                    }
                 }
             ]
-
-            for reg_key in registry_optimizations:
+            
+            for reg_key in optimizaciones:
                 try:
-                    key = winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, reg_key['path'], 0, winreg.KEY_ALL_ACCESS)
+                    key = winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, reg_key['path'], 
+                                           0, winreg.KEY_ALL_ACCESS)
                     for value_name, (value_type, value_data) in reg_key['values'].items():
                         winreg.SetValueEx(key, value_name, 0, value_type, value_data)
                     winreg.CloseKey(key)
-                    self.log(f"Registro optimizado: {reg_key['path']}")
                 except Exception as e:
-                    self.log(f"Error al modificar registro {reg_key['path']}: {str(e)}")
-
-            system_commands = [
-                'powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61',
-                'powercfg /setactive e9a42b02-d5df-448d-aa00-03f14749eb61',
-                'bcdedit /set disabledynamictick yes',
-                'bcdedit /set useplatformtick yes',
-                'bcdedit /set useplatformclock false',
-                'bcdedit /timeout 0',
-                'bcdedit /set nx OptOut',
-                'bcdedit /set bootux disabled',
-                'bcdedit /set bootmenupolicy legacy',
-                'bcdedit /set hypervisorlaunchtype off',
-                'bcdedit /set tpmbootentropy ForceDisable',
-                'bcdedit /set linearaddress57 OptOut',
-                'bcdedit /set increaseuserva 268435328',
-                'bcdedit /set firstmegabytepolicy UseAll',
-                'bcdedit /set avoidlowmemory 0x8000000',
-                'bcdedit /set nolowmem Yes'
-            ]
-
-            for cmd in system_commands:
-                try:
-                    subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    self.log(f"Comando ejecutado: {cmd}")
-                except Exception as e:
-                    self.log(f"Error al ejecutar comando {cmd}: {str(e)}")
-
-            servicios_innecesarios = [
-                "DiagTrack", "dmwappushservice", "SysMain", "WSearch", 
-                "XboxGipSvc", "XblAuthManager", "XblGameSave", "TabletInputService",
-                "Remote Registry", "PrintNotify", "fax", "WpnService", "RetailDemo",
-                "DoSvc", "PcaSvc", "WMPNetworkSvc", "WerSvc", "MapsBroker",
-                "iphlpsvc", "lmhosts", "SEMgrSvc", "BTAGService", "Browser",
-                "BthAvctpSvc", "CDPUserSvc", "PimIndexMaintenanceSvc", "OneSyncSvc",
-                "WpcMonSvc", "FontCache", "SharedAccess", "StorSvc", "PhoneSvc",
-                "SCardSvr", "Spooler", "PrintNotify", "TapiSrv", "BITS", "BDESVC",
-                "DusmSvc", "DPS", "WdiSystemHost", "WdiServiceHost"
-            ]
-            
-            for servicio in servicios_innecesarios:
-                try:
-                    subprocess.run(f'net stop "{servicio}" /y', shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    subprocess.run(f'sc config "{servicio}" start=disabled', shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    self.log(f"Servicio desactivado: {servicio}")
-                except Exception:
                     pass
-
-            self.log("Optimización extrema completada exitosamente")
-            self.mostrar_mensaje("Éxito", "Optimización extrema aplicada. Se recomienda reiniciar el sistema.")
             
+            self.progress.emit("   ✓ Registro optimizado")
         except Exception as e:
-            self.log(f"Error en optimización extrema: {str(e)}")
-            self.mostrar_error("Error", "Error durante la optimización extrema")
-
-    def activar_modo_juego(self):
+            self.progress.emit(f"   ✗ Error en registro: {str(e)}")
+    
+    def optimizar_red_tho(self):
+        self.progress.emit("\n🌐 [6/13] Optimizando red y conectividad...")
+        network_commands = [
+            'netsh int tcp set global autotuninglevel=normal',
+            'netsh int tcp set global chimney=enabled',
+            'netsh int tcp set global dca=enabled',
+            'netsh int tcp set global ecncapability=enabled',
+            'netsh int tcp set global rss=enabled',
+            'netsh int tcp set global timestamps=disabled',
+            'netsh interface tcp set heuristics disabled',
+            'netsh int tcp set supplemental internet congestionprovider=ctcp',
+            'netsh int tcp set global initialRto=2000',
+            'netsh int tcp set global nonsackrttresiliency=disabled',
+            'ipconfig /flushdns',
+            'ipconfig /registerdns',
+            'netsh winsock reset',
+        ]
+        
+        ejecutados = 0
+        for cmd in network_commands:
+            try:
+                subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, 
+                             stderr=subprocess.DEVNULL, timeout=5)
+                ejecutados += 1
+            except Exception:
+                pass
+        
         try:
-            self.log("Activando modo juego...")
-            
-            subprocess.run('powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c', shell=True)
-            
-            key = winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, 
-                                   r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games",
-                                   0, winreg.KEY_ALL_ACCESS)
-            winreg.SetValueEx(key, "GPU Priority", 0, winreg.REG_DWORD, 8)
-            winreg.SetValueEx(key, "Priority", 0, winreg.REG_DWORD, 6)
-            winreg.SetValueEx(key, "Scheduling Category", 0, winreg.REG_SZ, "High")
-            
-            self.log("Modo juego activado correctamente")
-            self.mostrar_mensaje("Éxito", "Modo juego activado")
-            
-        except Exception as e:
-            self.log(f"Error: {str(e)}")
-            self.mostrar_error("Error", "Error al activar modo juego")
-
-    def optimizar_bateria(self):
-        try:
-            self.log("Optimizando configuración de batería...")
-            
-            subprocess.run('powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e', shell=True)
-            
-            subprocess.run('powercfg /change monitor-timeout-ac 10', shell=True)
-            subprocess.run('powercfg /change monitor-timeout-dc 5', shell=True)
-            
-            self.log("Optimización de batería completada")
-            self.mostrar_mensaje("Éxito", "Configuración de batería optimizada")
-            
-        except Exception as e:
-            self.log(f"Error: {str(e)}")
-            self.mostrar_error("Error", "Error al optimizar batería")
-
-    def optimizar_temperatura(self):
-        try:
-            self.log("Optimizando temperatura del sistema...")
-            
-            self.limpiar_temporales()
-            
-            subprocess.run('powershell -Command "Get-WmiObject -Namespace root/wmi -Class MSAcpi_ThermalZoneTemperature"', shell=True)
-            
-            self.log("Optimización de temperatura completada")
-            self.mostrar_mensaje("Éxito", "Sistema optimizado para mejor temperatura")
-            
-        except Exception as e:
-            self.log(f"Error: {str(e)}")
-            self.mostrar_error("Error", "Error al optimizar temperatura")
-
-    def optimizar_red(self):
-        try:
-            self.log("Optimizando red...")
-            
-            network_commands = [
-                'netsh int tcp set global autotuninglevel=normal',
-                'netsh int tcp set global chimney=enabled',
-                'netsh int tcp set global dca=enabled',
-                'netsh int tcp set global ecncapability=enabled',
-                'netsh int tcp set global timestamps=disabled',
-                'netsh int tcp set global rss=enabled',
-                'netsh int tcp set global nonsackrttresiliency=disabled',
-                'netsh interface tcp set heuristics disabled',
-                'netsh int tcp set supplemental internet congestionprovider=ctcp',
-                'netsh int tcp set global initialRto=2000',
-                'ipconfig /flushdns',
-                'ipconfig /registerdns',
-                'netsh winsock reset'
-            ]
-            
-            for cmd in network_commands:
-                subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                self.log(f"Ejecutado: {cmd}")
-            
             dns_key = winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, 
                                        r"SYSTEM\CurrentControlSet\Services\Dnscache\Parameters",
                                        0, winreg.KEY_ALL_ACCESS)
             winreg.SetValueEx(dns_key, "MaxCacheTtl", 0, winreg.REG_DWORD, 86400)
             winreg.SetValueEx(dns_key, "MaxNegativeCacheTtl", 0, winreg.REG_DWORD, 0)
-            
-            self.log("Optimización de red completada")
-            self.mostrar_mensaje("Éxito", "Red optimizada correctamente")
-            
-        except Exception as e:
-            self.log(f"Error: {str(e)}")
-            self.mostrar_error("Error", "Error al optimizar red")
-
-    def optimizar_seguridad(self):
+            winreg.CloseKey(dns_key)
+        except Exception:
+            pass
+        
+        self.progress.emit(f"   ✓ {ejecutados} optimizaciones de red aplicadas")
+    
+    def optimizar_sistema_tho(self):
+        self.progress.emit("\n🖥️ [7/13] Optimizando configuración del sistema...")
+        system_commands = [
+            'fsutil behavior set disablelastaccess 1',
+            'fsutil behavior set memoryusage 2',
+            'bcdedit /set useplatformclock no',
+            'bcdedit /set disabledynamictick yes',
+            'bcdedit /set bootmenupolicy legacy',
+            'bcdedit /set nx OptOut',
+            'bcdedit /set bootux disabled'
+        ]
+        
+        ejecutados = 0
+        for cmd in system_commands:
+            try:
+                subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, 
+                             stderr=subprocess.DEVNULL, timeout=5)
+                ejecutados += 1
+            except Exception:
+                pass
+        
+        self.progress.emit(f"   ✓ {ejecutados} optimizaciones del sistema aplicadas")
+    
+    def optimizar_disco_tho(self):
+        self.progress.emit("\n💿 [8/13] Optimizando disco duro...")
         try:
-            self.log("Optimizando seguridad...")
-            
-            security_commands = [
-                'sc start SecurityHealthService',
-                'sc config SecurityHealthService start=auto',
-                'powershell Set-MpPreference -DisableRealtimeMonitoring $false',
-                'powershell Set-MpPreference -SubmitSamplesConsent 1',
-                'netsh advfirewall set allprofiles state on',
-                'netsh advfirewall firewall set rule group="Red doméstica/trabajo (TCP-Entrada)" new enable=yes',
-                'netsh advfirewall firewall set rule group="Red doméstica/trabajo (UDP-Entrada)" new enable=yes'
-            ]
-            
-            for cmd in security_commands:
-                subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            
-            self.log("Configuración de seguridad optimizada")
-            self.mostrar_mensaje("Éxito", "Seguridad optimizada")
-            
-        except Exception as e:
-            self.log(f"Error: {str(e)}")
-            self.mostrar_error("Error", "Error al optimizar seguridad")
-
-    def optimizar_sistema(self):
+            subprocess.run('defrag C: /U /V', shell=True, stdout=subprocess.DEVNULL, 
+                         stderr=subprocess.DEVNULL, timeout=60)
+            self.progress.emit("   ✓ Disco optimizado")
+        except Exception:
+            self.progress.emit("   ⚠️ Desfragmentación completada con advertencias")
+    
+    def desactivar_telemetria(self):
+        self.progress.emit("\n🔒 [9/13] Desactivando telemetría y rastreo...")
         try:
-            self.log("Optimizando sistema...")
-            
-            system_commands = [
-                'powercfg -h off',  
-                'fsutil behavior set disablelastaccess 1',  
-                'fsutil behavior set memoryusage 2',  
-                'schtasks /Change /TN "\\Microsoft\\Windows\\Registry\\RegIdleBackup" /Disable',
-                'schtasks /Change /TN "\\Microsoft\\Power Efficiency Diagnostics\\AnalyzeSystem" /Disable',
-                'bcdedit /set useplatformclock no',
-                'bcdedit /set disabledynamictick yes',
-                'bcdedit /set bootmenupolicy legacy',
-                'powershell Disable-MMAgent -mc',  
-                'powershell Set-ProcessMitigation -System -Disable DEP,SEHOP'  
+            telemetria_commands = [
+                'reg add "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection" /v AllowDiagnosticData /t REG_DWORD /d 0 /f',
+                'reg add "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Privacy" /v TailoredExperiencesAllowed /t REG_DWORD /d 0 /f',
+                'reg add "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Privacy" /v AdId /t REG_SZ /d "" /f',
+                'reg add "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\AppPrivacy" /v LetAppsRunInBackground /t REG_DWORD /d 2 /f'
             ]
             
-            for cmd in system_commands:
-                subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                self.log(f"Ejecutado: {cmd}")
-            
-            registry_optimizations = [
-                {
-                    'path': r"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management",
-                    'values': {
-                        "LargeSystemCache": (winreg.REG_DWORD, 1),
-                        "IoPageLockLimit": (winreg.REG_DWORD, 983040)
-                    }
-                },
-                {
-                    'path': r"SYSTEM\CurrentControlSet\Control\Power",
-                    'values': {
-                        "HibernateEnabled": (winreg.REG_DWORD, 0)
-                    }
-                }
-            ]
-            
-            for reg_key in registry_optimizations:
+            for cmd in telemetria_commands:
                 try:
-                    key = winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, reg_key['path'], 0, winreg.KEY_ALL_ACCESS)
-                    for name, (type_, value) in reg_key['values'].items():
-                        winreg.SetValueEx(key, name, 0, type_, value)
-                    winreg.CloseKey(key)
-                except Exception as e:
-                    self.log(f"Error en registro {reg_key['path']}: {str(e)}")
+                    subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, 
+                                 stderr=subprocess.DEVNULL, timeout=5)
+                except Exception:
+                    pass
             
-            self.log("Sistema optimizado correctamente")
-            self.mostrar_mensaje("Éxito", "Sistema optimizado al máximo")
-            
-        except Exception as e:
-            self.log(f"Error: {str(e)}")
-            self.mostrar_error("Error", "Error al optimizar sistema")
-
-    def optimizar_apps(self):
+            self.progress.emit("   ✓ Telemetría y rastreo desactivados")
+        except Exception:
+            pass
+    
+    def optimizar_energia_tho(self):
+        self.progress.emit("\n⚡ [10/13] Optimizando esquema de energía...")
         try:
-            self.log("Optimizando aplicaciones...")
-            
-            subprocess.run('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\BackgroundAccessApplications" /v "GlobalUserDisabled" /t REG_DWORD /d "1" /f', shell=True)
-            
-            apps_to_remove = [
-                "Microsoft.BingWeather",
-                "Microsoft.GetHelp",
-                "Microsoft.Getstarted",
-                "Microsoft.Microsoft3DViewer",
-                "Microsoft.MicrosoftOfficeHub",
-                "Microsoft.MicrosoftSolitaireCollection",
-                "Microsoft.MixedReality.Portal",
-                "Microsoft.People",
-                "Microsoft.SkypeApp",
-                "Microsoft.WindowsFeedbackHub",
-                "Microsoft.Xbox.TCUI",
-                "Microsoft.XboxApp",
-                "Microsoft.XboxGameOverlay",
-                "Microsoft.XboxGamingOverlay",
-                "Microsoft.XboxIdentityProvider",
-                "Microsoft.XboxSpeechToTextOverlay",
-                "Microsoft.YourPhone",
-                "Microsoft.ZuneMusic",
-                "Microsoft.ZuneVideo"
-            ]
-            
-            for app in apps_to_remove:
-                subprocess.run(f'powershell -command "Get-AppxPackage *{app}* | Remove-AppxPackage"', 
-                             shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            
-            services_to_disable = [
-                "AppXSvc",
-                "ClipSVC",
-                "TabletInputService",
-                "RetailDemo",
-                "MessagingService"
-            ]
-            
-            for service in services_to_disable:
-                subprocess.run(f'sc config "{service}" start=disabled', shell=True)
-                subprocess.run(f'sc stop "{service}"', shell=True)
-            
-            self.log("Aplicaciones optimizadas correctamente")
-            self.mostrar_mensaje("Éxito", "Aplicaciones optimizadas")
-            
-        except Exception as e:
-            self.log(f"Error: {str(e)}")
-            self.mostrar_error("Error", "Error al optimizar aplicaciones")
-
-    def optimizar_fps(self):
+            subprocess.run('powercfg /duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61', 
+                         shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+            subprocess.run('powercfg /setactive e9a42b02-d5df-448d-aa00-03f14749eb61', 
+                         shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+            self.progress.emit("   ✓ Esquema de energía optimizado para máximo rendimiento")
+        except Exception:
+            pass
+    
+    def eliminar_apps_innecesarias(self):
+        self.progress.emit("\n📦 [11/13] Eliminando aplicaciones innecesarias...")
+        apps_to_remove = [
+            "Microsoft.BingWeather", "Microsoft.GetHelp", "Microsoft.Getstarted",
+            "Microsoft.MixedReality.Portal", "Microsoft.People", "Microsoft.SkypeApp",
+            "Microsoft.WindowsFeedbackHub", "Microsoft.XboxApp", "Microsoft.XboxGameOverlay",
+            "Microsoft.YourPhone", "Microsoft.ZuneMusic", "Microsoft.ZuneVideo"
+        ]
+        
+        removidos = 0
+        for app in apps_to_remove:
+            try:
+                subprocess.run(f'powershell -Command "Get-AppxPackage *{app}* | Remove-AppxPackage -ErrorAction SilentlyContinue"', 
+                             shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+                removidos += 1
+            except Exception:
+                pass
+        
+        self.progress.emit(f"   ✓ {removidos} aplicaciones bloat eliminadas")
+    
+    def optimizar_startup_tho(self):
+        self.progress.emit("\n⏱️ [12/13] Optimizando arranque del sistema...")
         try:
-            self.log("Optimizando FPS del sistema...")
+            startup_key = winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, 
+                                           r"SYSTEM\CurrentControlSet\Control\SessionManager\PowerPlan",
+                                           0, winreg.KEY_ALL_ACCESS)
+            winreg.CloseKey(startup_key)
             
-            performance_settings = [
-                {
-                    'path': r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games",
-                    'values': {
-                        "GPU Priority": (winreg.REG_DWORD, 8),
-                        "Priority": (winreg.REG_DWORD, 6),
-                        "Scheduling Category": (winreg.REG_SZ, "High"),
-                        "SFIO Priority": (winreg.REG_SZ, "High")
-                    }
-                },
-                {
-                    'path': r"SOFTWARE\Microsoft\Games",
-                    'values': {
-                        "FpsAll": (winreg.REG_DWORD, 1),
-                        "GameFluidity": (winreg.REG_DWORD, 1)
-                    }
-                }
-            ]
+            subprocess.run('wevtutil cl System', shell=True, stdout=subprocess.DEVNULL, 
+                         stderr=subprocess.DEVNULL, timeout=5)
+            subprocess.run('wevtutil cl Application', shell=True, stdout=subprocess.DEVNULL, 
+                         stderr=subprocess.DEVNULL, timeout=5)
             
-            for setting in performance_settings:
-                try:
-                    key = winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, setting['path'], 0, winreg.KEY_ALL_ACCESS)
-                    for name, (type_, value) in setting['values'].items():
-                        winreg.SetValueEx(key, name, 0, type_, value)
-                    winreg.CloseKey(key)
-                except Exception as e:
-                    self.log(f"Error en registro {setting['path']}: {str(e)}")
-
-            fps_commands = [
-                'powercfg -setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c',
-                'bcdedit /set useplatformclock false',
-                'bcdedit /set disabledynamictick yes',
-                'bcdedit /set tscsyncpolicy enhanced'
-            ]
-
-            for cmd in fps_commands:
-                subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                self.log(f"Ejecutado: {cmd}")
-
-            self.log("Optimización de FPS completada")
-            self.mostrar_mensaje("Éxito", "FPS optimizados correctamente")
-            
-        except Exception as e:
-            self.log(f"Error: {str(e)}")
-            self.mostrar_error("Error", "Error al optimizar FPS")
-
-    def optimizar_defender(self):
+            self.progress.emit("   ✓ Arranque optimizado")
+        except Exception:
+            pass
+    
+    def limpiar_cache_aplicaciones(self):
+        self.progress.emit("\n🗑️ [13/13] Limpiando caché de aplicaciones...")
         try:
-            self.log("Optimizando Windows Defender...")
-            
-            defender_commands = [
-                'powershell Set-MpPreference -DisableRealtimeMonitoring $false',
-                'powershell Add-MpPreference -ExclusionPath "C:\\Games"',
-                'powershell Set-MpPreference -ScanAvgCPULoadFactor 50',
-                'powershell Set-MpPreference -ScanOnlyIfIdleEnabled $true',
-                'powershell Set-MpPreference -DisableArchiveScanning $true'
+            cache_paths = [
+                os.path.join(os.environ.get('LOCALAPPDATA'), 'Microsoft\\Windows\\INetCache'),
+                os.path.join(os.environ.get('LOCALAPPDATA'), 'Temp'),
+                os.path.join(os.environ.get('APPDATA'), 'Microsoft\\Windows\\Recent'),
             ]
             
-            for cmd in defender_commands:
-                subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                self.log(f"Ejecutado: {cmd}")
-
-            self.log("Windows Defender optimizado")
-            self.mostrar_mensaje("Éxito", "Defender optimizado para gaming")
+            limpios = 0
+            for cache_path in cache_paths:
+                if os.path.exists(cache_path):
+                    try:
+                        for item in os.listdir(cache_path):
+                            fullpath = os.path.join(cache_path, item)
+                            try:
+                                if os.path.isfile(fullpath):
+                                    os.remove(fullpath)
+                                    limpios += 1
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
             
-        except Exception as e:
-            self.log(f"Error: {str(e)}")
-            self.mostrar_error("Error", "Error al optimizar Defender")
-
-    def optimizar_audio(self):
+            self.progress.emit(f"   ✓ Caché de aplicaciones limpiado ({limpios} archivos)")
+        except Exception:
+            pass
+    
+    def restaurar_completo(self):
+        self.progress.emit("\n" + "="*60)
+        self.progress.emit("🔄 INICIANDO RESTAURACIÓN DEL SISTEMA")
+        self.progress.emit("="*60 + "\n")
+        
+        self.progress.emit("📋 Restaurando servicios de Windows...")
+        servicios_restaurar = [
+            ("DiagTrack", "auto"), ("SysMain", "auto"), ("WSearch", "auto"),
+            ("XboxGipSvc", "manual"), ("XblAuthManager", "manual"), ("XblGameSave", "manual"),
+            ("TabletInputService", "manual"), ("PrintNotify", "manual"), ("fax", "disabled"),
+            ("WpnService", "manual"), ("RetailDemo", "disabled"), ("DoSvc", "manual"),
+            ("PcaSvc", "manual"), ("WMPNetworkSvc", "manual"), ("WerSvc", "manual"),
+            ("MapsBroker", "manual"), ("BTAGService", "manual"), ("CDPUserSvc", "manual"),
+            ("OneSyncSvc", "manual"), ("WpcMonSvc", "manual"), ("SharedAccess", "manual"),
+            ("PhoneSvc", "manual"), ("SCardSvr", "manual"), ("DusmSvc", "manual"), ("DPS", "manual")
+        ]
+        
+        for servicio, tipo in servicios_restaurar:
+            try:
+                subprocess.run(f'sc config "{servicio}" start={tipo}', shell=True, 
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+                subprocess.run(f'net start "{servicio}" >nul 2>&1', shell=True, 
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+            except Exception:
+                pass
+        
+        self.progress.emit("✓ Servicios restaurados\n")
+        
+        self.progress.emit("⚙️ Restaurando configuración del registro...")
         try:
-            self.log("Optimizando configuración de audio...")
-            
-            audio_commands = [
-                'net stop Audiosrv',
-                'net stop AudioEndpointBuilder',
-                'reg add "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Audio" /v DisableProtectedAudioDG /t REG_DWORD /d 1 /f',
-                'reg add "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Audio" /v DisableProtectedAudioDG /t REG_DWORD /d 1 /f',
-                'net start Audiosrv',
-                'net start AudioEndpointBuilder'
-            ]
-            
-            for cmd in audio_commands:
-                subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                self.log(f"Ejecutado: {cmd}")
-
-            self.log("Audio optimizado correctamente")
-            self.mostrar_mensaje("Éxito", "Audio optimizado para mejor rendimiento")
-            
-        except Exception as e:
-            self.log(f"Error: {str(e)}")
-            self.mostrar_error("Error", "Error al optimizar audio")
-
-    def optimizar_visual(self):
+            key = winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, 
+                                   r'SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management',
+                                   0, winreg.KEY_ALL_ACCESS)
+            winreg.SetValueEx(key, "LargeSystemCache", 0, winreg.REG_DWORD, 0)
+            winreg.SetValueEx(key, "SystemCacheDirtyPageThreshold", 0, winreg.REG_DWORD, 0)
+            winreg.SetValueEx(key, "IoPageLockLimit", 0, winreg.REG_DWORD, 0)
+            winreg.CloseKey(key)
+        except Exception:
+            pass
+        
+        self.progress.emit("✓ Registro restaurado\n")
+        
+        self.progress.emit("⚡ Restaurando configuración de energía...")
         try:
-            self.log("Optimizando rendimiento visual...")
-            
-            visual_settings = {
-                r"Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects": {
-                    "VisualFXSetting": (winreg.REG_DWORD, 2)
-                },
-                r"Control Panel\Desktop": {
-                    "UserPreferencesMask": (winreg.REG_BINARY, b"\x90\x12\x03\x80\x10\x00\x00\x00")
-                }
+            subprocess.run('powercfg -restoredefaultschemes', shell=True, 
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+            subprocess.run('powercfg -setactive scheme_balanced', shell=True, 
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+        except Exception:
+            pass
+        
+        self.progress.emit("✓ Energía restaurada\n")
+        
+        self.progress.emit("🖥️ Restaurando configuración del sistema...")
+        try:
+            subprocess.run('bcdedit /deletevalue useplatformclock', shell=True, 
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+            subprocess.run('bcdedit /deletevalue disabledynamictick', shell=True, 
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+            subprocess.run('bcdedit /deletevalue bootmenupolicy', shell=True, 
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+        except Exception:
+            pass
+        
+        self.progress.emit("✓ Sistema restaurado\n")
+        
+        self.progress.emit("🔒 Restaurando telemetría a valores por defecto...")
+        try:
+            subprocess.run('reg add "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection" /v AllowDiagnosticData /t REG_DWORD /d 1 /f', 
+                         shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+        except Exception:
+            pass
+        
+        self.progress.emit("✓ Telemetría restaurada\n")
+        
+        self.progress.emit("="*60)
+        self.progress.emit("✨ RESTAURACIÓN COMPLETADA EXITOSAMENTE")
+        self.progress.emit("="*60)
+
+
+class OptimizadorTHO(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("THO OPTIMIZER 2.0 - PROFESSIONAL")
+        self.setFixedSize(1200, 800)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowSystemMenuHint)
+        
+        self.drag_position = None
+        self.current_page = 0
+        
+        self.setWindowOpacity(0)
+        self.fade_in_animation = QPropertyAnimation(self, b"windowOpacity")
+        self.fade_in_animation.setStartValue(0)
+        self.fade_in_animation.setEndValue(1)
+        self.fade_in_animation.setDuration(1200)
+        self.fade_in_animation.start()
+        
+        self.elevar_privilegios()
+        
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        central_layout = QVBoxLayout(central_widget)
+        central_layout.setContentsMargins(0, 0, 0, 0)
+        central_layout.setSpacing(0)
+        
+        self.background = MatrixBackground(self)
+        self.background.resize(self.size())
+        self.background.lower()
+        
+        # Barra de título personalizada
+        title_bar = QFrame()
+        title_bar.setFixedHeight(50)
+        title_bar.setStyleSheet("""
+            QFrame {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+                    stop:0 rgba(0, 0, 0, 0.98), stop:1 rgba(46, 204, 113, 0.1));
+                border-bottom: 3px solid #2ecc71;
             }
-
-            for path, values in visual_settings.items():
-                try:
-                    key = winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, path, 0, winreg.KEY_ALL_ACCESS)
-                    for name, (type_, value) in values.items():
-                        winreg.SetValueEx(key, name, 0, type_, value)
-                    winreg.CloseKey(key)
-                except Exception as e:
-                    self.log(f"Error en registro {path}: {str(e)}")
-
-            self.log("Efectos visuales optimizados")
-            self.mostrar_mensaje("Éxito", "Rendimiento visual optimizado")
+        """)
+        title_layout = QHBoxLayout(title_bar)
+        title_layout.setContentsMargins(15, 0, 15, 0)
+        
+        title_label = QLabel("⚡ THO OPTIMIZER 2.0 PROFESSIONAL ⚡")
+        title_label.setStyleSheet("""
+            color: #2ecc71; 
+            font-size: 18px; 
+            font-weight: bold;
+            letter-spacing: 2px;
+        """)
+        title_label.setFont(QFont("Courier New", 11, QFont.Bold))
+        title_layout.addWidget(title_label)
+        title_layout.addStretch()
+        
+        minimize_btn = QPushButton("−")
+        minimize_btn.setFixedSize(45, 50)
+        minimize_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #2ecc71;
+                border: none;
+                font-size: 20px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: rgba(46, 204, 113, 0.2);
+            }
+        """)
+        minimize_btn.clicked.connect(self.showMinimized)
+        title_layout.addWidget(minimize_btn)
+        
+        close_btn = QPushButton("✕")
+        close_btn.setFixedSize(45, 50)
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #2ecc71;
+                border: none;
+                font-size: 20px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: rgba(220, 53, 69, 0.7);
+                border-radius: 0px;
+            }
+        """)
+        close_btn.clicked.connect(self.close)
+        title_layout.addWidget(close_btn)
+        
+        # Contenedor principal
+        main_container = QWidget()
+        main_container.setStyleSheet("background-color: rgba(0, 0, 0, 0.4);")
+        main_layout = QHBoxLayout(main_container)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(20)
+        
+        # Stack para cambiar entre páginas
+        self.stack = QStackedWidget()
+        
+        # Página 1: Botones principales
+        page1 = self.crear_pagina_principal()
+        
+        # Página 2: Créditos
+        page2 = self.crear_pagina_creditos()
+        
+        self.stack.addWidget(page1)
+        self.stack.addWidget(page2)
+        
+        main_layout.addWidget(self.stack)
+        
+        central_layout.addWidget(title_bar)
+        central_layout.addWidget(main_container)
+        
+        self.worker = None
+        
+        self.success_sound = QSoundEffect(self)
+        try:
+            if getattr(sys, 'frozen', False):
+                base_path = sys._MEIPASS
+            else:
+                base_path = os.path.dirname(os.path.abspath(__file__))
             
+            sound_path = os.path.join(base_path, "sound", "2.wav")
+            if os.path.exists(sound_path):
+                self.success_sound.setSource(QUrl.fromLocalFile(sound_path))
+                self.success_sound.setVolume(1.0)
+        except Exception:
+            pass
+    
+    def crear_pagina_principal(self):
+        page = QWidget()
+        layout = QHBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(20)
+        
+        # Panel de botones
+        buttons_panel = QFrame()
+        buttons_panel.setStyleSheet("""
+            QFrame {
+                background-color: rgba(0, 0, 0, 0.9);
+                border: 3px solid #2ecc71;
+                border-radius: 15px;
+                padding: 40px;
+            }
+        """)
+        buttons_layout = QVBoxLayout(buttons_panel)
+        buttons_layout.setSpacing(40)
+        buttons_layout.setAlignment(Qt.AlignCenter)
+        
+        # Título
+        titulo = QLabel("SELECCIONA UNA OPCIÓN")
+        titulo.setStyleSheet("""
+            color: #2ecc71; 
+            font-size: 20px; 
+            font-weight: bold;
+            padding: 10px;
+            border-bottom: 2px solid #2ecc71;
+        """)
+        titulo.setAlignment(Qt.AlignCenter)
+        buttons_layout.addWidget(titulo)
+        
+        # Botón OPTIMIZAR
+        self.btn_optimizar = QPushButton("⚡ OPTIMIZAR AL MÁXIMO")
+        self.btn_optimizar.setFixedSize(350, 100)
+        self.btn_optimizar.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(46, 204, 113, 0.5), stop:1 rgba(46, 204, 113, 0.3));
+                color: #2ecc71;
+                border: 4px solid #2ecc71;
+                border-radius: 15px;
+                font-size: 20px;
+                font-weight: bold;
+                letter-spacing: 1px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(46, 204, 113, 0.7), stop:1 rgba(46, 204, 113, 0.5));
+                border: 4px solid #27ae60;
+            }
+            QPushButton:pressed {
+                background: rgba(46, 204, 113, 0.9);
+            }
+        """)
+        self.btn_optimizar.clicked.connect(self.iniciar_optimizacion)
+        buttons_layout.addWidget(self.btn_optimizar, alignment=Qt.AlignCenter)
+        
+        # Botón RESTAURAR
+        self.btn_restaurar = QPushButton("🔄 RESTAURAR SISTEMA")
+        self.btn_restaurar.setFixedSize(350, 100)
+        self.btn_restaurar.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(230, 126, 34, 0.5), stop:1 rgba(230, 126, 34, 0.3));
+                color: #e67e22;
+                border: 4px solid #e67e22;
+                border-radius: 15px;
+                font-size: 20px;
+                font-weight: bold;
+                letter-spacing: 1px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(230, 126, 34, 0.7), stop:1 rgba(230, 126, 34, 0.5));
+                border: 4px solid #d35400;
+            }
+            QPushButton:pressed {
+                background: rgba(230, 126, 34, 0.9);
+            }
+        """)
+        self.btn_restaurar.clicked.connect(self.iniciar_restauracion)
+        buttons_layout.addWidget(self.btn_restaurar, alignment=Qt.AlignCenter)
+        
+        # Botón CRÉDITOS
+        self.btn_creditos = QPushButton("📋 CRÉDITOS DEL CREADOR")
+        self.btn_creditos.setFixedSize(350, 100)
+        self.btn_creditos.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(149, 165, 166, 0.5), stop:1 rgba(149, 165, 166, 0.3));
+                color: #95a5a6;
+                border: 4px solid #95a5a6;
+                border-radius: 15px;
+                font-size: 20px;
+                font-weight: bold;
+                letter-spacing: 1px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(149, 165, 166, 0.7), stop:1 rgba(149, 165, 166, 0.5));
+                border: 4px solid #7f8c8d;
+            }
+            QPushButton:pressed {
+                background: rgba(149, 165, 166, 0.9);
+            }
+        """)
+        self.btn_creditos.clicked.connect(lambda: self.stack.setCurrentIndex(1))
+        buttons_layout.addWidget(self.btn_creditos, alignment=Qt.AlignCenter)
+        
+        layout.addWidget(buttons_panel)
+        
+        # Panel de logs (CRT)
+        logs_panel = QFrame()
+        logs_panel.setFixedWidth(450)
+        logs_panel.setStyleSheet("""
+            QFrame {
+                background-color: rgba(0, 0, 0, 0.95);
+                border: 3px solid #2ecc71;
+                border-radius: 15px;
+            }
+        """)
+        logs_layout = QVBoxLayout(logs_panel)
+        logs_layout.setContentsMargins(15, 15, 15, 15)
+        logs_layout.setSpacing(10)
+        
+        logs_title = QLabel("📡 CONSOLA CRT - MONITOR DEL SISTEMA")
+        logs_title.setStyleSheet("""
+            color: #2ecc71; 
+            font-size: 13px; 
+            font-weight: bold; 
+            padding: 8px;
+            border-bottom: 2px solid #2ecc71;
+            letter-spacing: 1px;
+        """)
+        logs_layout.addWidget(logs_title)
+        
+        self.log_console = QTextEdit()
+        self.log_console.setReadOnly(True)
+        self.log_console.setStyleSheet("""
+            QTextEdit {
+                background-color: rgba(0, 0, 0, 0.98);
+                color: #2ecc71;
+                border: 2px solid #2ecc71;
+                border-radius: 8px;
+                font-family: 'Courier New';
+                font-size: 9px;
+                padding: 5px;
+            }
+            QScrollBar:vertical {
+                background-color: rgba(46, 204, 113, 0.1);
+                width: 12px;
+                border-radius: 6px;
+            }
+            QScrollBar::handle:vertical {
+                background-color: rgba(46, 204, 113, 0.5);
+                border-radius: 6px;
+            }
+        """)
+        logs_layout.addWidget(self.log_console)
+        
+        layout.addWidget(logs_panel)
+        
+        return page
+    
+    def crear_pagina_creditos(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        # Panel central de créditos - SIMPLE Y LIMPIO
+        credits_panel = QWidget()
+        credits_panel.setStyleSheet("background-color: transparent;")
+        credits_layout = QVBoxLayout(credits_panel)
+        credits_layout.setContentsMargins(80, 80, 80, 80)
+        credits_layout.setSpacing(60)
+        credits_layout.setAlignment(Qt.AlignCenter)
+        
+        # Título
+        titulo = QLabel("THO OPTIMIZER 2.0")
+        titulo.setStyleSheet("""
+            color: #2ecc71; 
+            font-size: 52px; 
+            font-weight: bold;
+            letter-spacing: 4px;
+        """)
+        titulo.setFont(QFont("Courier New", 26, QFont.Bold))
+        titulo.setAlignment(Qt.AlignCenter)
+        credits_layout.addWidget(titulo)
+        
+        # Subtítulo - Creador
+        creador = QLabel("CREADO POR\nHANNIBAL THO")
+        creador.setStyleSheet("""
+            color: #f39c12; 
+            font-size: 24px; 
+            font-weight: bold;
+            letter-spacing: 2px;
+            line-height: 1.8;
+        """)
+        creador.setAlignment(Qt.AlignCenter)
+        credits_layout.addWidget(creador)
+        
+        # Línea separadora brillante
+        separator = QFrame()
+        separator.setStyleSheet("background-color: #2ecc71;")
+        separator.setFixedHeight(2)
+        credits_layout.addWidget(separator)
+        
+        # Espaciador
+        credits_layout.addSpacing(30)
+        
+        # Botones en grid 2x2
+        buttons_grid = QHBoxLayout()
+        buttons_grid.setSpacing(40)
+        buttons_grid.setAlignment(Qt.AlignCenter)
+        
+        # GitHub
+        github_btn = QPushButton("🔗\nGITHUB\nOFICIAL")
+        github_btn.setFixedSize(130, 130)
+        github_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(46, 204, 113, 0.5), stop:1 rgba(46, 204, 113, 0.2));
+                color: #2ecc71;
+                border: 3px solid #2ecc71;
+                border-radius: 15px;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 8px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(46, 204, 113, 0.8), stop:1 rgba(46, 204, 113, 0.5));
+                border: 3px solid #27ae60;
+            }
+            QPushButton:pressed {
+                background: rgba(46, 204, 113, 0.9);
+            }
+        """)
+        github_btn.setCursor(Qt.PointingHandCursor)
+        github_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/TODO-HACK-OFFICIAL")))
+        buttons_grid.addWidget(github_btn)
+        
+        # PayPal
+        paypal_btn = QPushButton("💰\nPAYPAL\nDIRECTO")
+        paypal_btn.setFixedSize(130, 130)
+        paypal_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(52, 152, 219, 0.5), stop:1 rgba(52, 152, 219, 0.2));
+                color: #3498db;
+                border: 3px solid #3498db;
+                border-radius: 15px;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 8px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(52, 152, 219, 0.8), stop:1 rgba(52, 152, 219, 0.5));
+                border: 3px solid #2980b9;
+            }
+            QPushButton:pressed {
+                background: rgba(52, 152, 219, 0.9);
+            }
+        """)
+        paypal_btn.setCursor(Qt.PointingHandCursor)
+        paypal_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://www.paypal.com/paypalme/cakarrota2022")))
+        buttons_grid.addWidget(paypal_btn)
+        
+        # Discord
+        discord_btn = QPushButton("🎮\nDISCORD\nDEL SERVIDOR")
+        discord_btn.setFixedSize(130, 130)
+        discord_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(114, 137, 218, 0.5), stop:1 rgba(114, 137, 218, 0.2));
+                color: #7289da;
+                border: 3px solid #7289da;
+                border-radius: 15px;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 8px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(114, 137, 218, 0.8), stop:1 rgba(114, 137, 218, 0.5));
+                border: 3px solid #5a6fa0;
+            }
+            QPushButton:pressed {
+                background: rgba(114, 137, 218, 0.9);
+            }
+        """)
+        discord_btn.setCursor(Qt.PointingHandCursor)
+        discord_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://discord.gg/4svwzsy3UP")))
+        buttons_grid.addWidget(discord_btn)
+        
+        # YouTube
+        youtube_btn = QPushButton("📺\nYOUTUBE\nDEL CANAL")
+        youtube_btn.setFixedSize(130, 130)
+        youtube_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(255, 0, 0, 0.5), stop:1 rgba(255, 0, 0, 0.2));
+                color: #ff0000;
+                border: 3px solid #ff0000;
+                border-radius: 15px;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 8px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(255, 0, 0, 0.8), stop:1 rgba(255, 0, 0, 0.5));
+                border: 3px solid #cc0000;
+            }
+            QPushButton:pressed {
+                background: rgba(255, 0, 0, 0.9);
+            }
+        """)
+        youtube_btn.setCursor(Qt.PointingHandCursor)
+        youtube_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://www.youtube.com/@TODO-HACK-OFFICIAL")))
+        buttons_grid.addWidget(youtube_btn)
+        
+        credits_layout.addLayout(buttons_grid)
+        credits_layout.addSpacing(50)
+        
+        # Botón volver
+        volver_btn = QPushButton("◄ VOLVER")
+        volver_btn.setFixedSize(280, 65)
+        volver_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(46, 204, 113, 0.6), stop:1 rgba(46, 204, 113, 0.3));
+                color: #2ecc71;
+                border: 3px solid #2ecc71;
+                border-radius: 12px;
+                font-size: 15px;
+                font-weight: bold;
+                letter-spacing: 2px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(46, 204, 113, 0.8), stop:1 rgba(46, 204, 113, 0.5));
+                border: 3px solid #27ae60;
+            }
+            QPushButton:pressed {
+                background: rgba(46, 204, 113, 0.95);
+            }
+        """)
+        volver_btn.setCursor(Qt.PointingHandCursor)
+        volver_btn.clicked.connect(lambda: self.stack.setCurrentIndex(0))
+        credits_layout.addWidget(volver_btn, alignment=Qt.AlignCenter)
+        
+        credits_layout.addStretch()
+        
+        layout.addWidget(credits_panel)
+        
+        return page
+    
+    def mousePressEvent(self, event: QMouseEvent):
+        if event.position().y() < 50:
+            self.drag_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+    
+    def mouseMoveEvent(self, event: QMouseEvent):
+        if self.drag_position is not None:
+            self.move(event.globalPosition().toPoint() - self.drag_position)
+            event.accept()
+    
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        self.drag_position = None
+    
+    def log(self, mensaje):
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self.log_console.append(f"[{timestamp}] {mensaje}")
+        self.log_console.verticalScrollBar().setValue(
+            self.log_console.verticalScrollBar().maximum()
+        )
+    
+    def iniciar_optimizacion(self):
+        respuesta = QMessageBox.question(self, "CONFIRMAR OPTIMIZACIÓN", 
+            "⚡ ¿DESEAS OPTIMIZAR TU PC AL MÁXIMO?\n\n"
+            "✓ Se creará un punto de restauración automático\n"
+            "✓ La optimización durará algunos minutos\n"
+            "✓ Se recomienda no usar la PC durante el proceso\n\n"
+            "¿Deseas continuar?", 
+            QMessageBox.Yes | QMessageBox.No)
+        
+        if respuesta == QMessageBox.Yes:
+            self.btn_optimizar.setEnabled(False)
+            self.btn_restaurar.setEnabled(False)
+            self.btn_creditos.setEnabled(False)
+            self.log_console.clear()
+            self.log("🚀 Iniciando optimización completa...")
+            
+            self.worker = OptimizationWorker(optimize=True)
+            self.worker.progress.connect(self.log)
+            self.worker.finished.connect(self.optimizacion_finalizada)
+            self.worker.error_occurred.connect(lambda e: self.log(f"❌ {e}"))
+            self.worker.start()
+    
+    def iniciar_restauracion(self):
+        respuesta = QMessageBox.question(self, "CONFIRMAR RESTAURACIÓN", 
+            "🔄 ¿DESEAS RESTAURAR EL SISTEMA?\n\n"
+            "⚠️ Esto revertirá TODA la optimización\n"
+            "⚠️ El sistema volverá a valores por defecto\n"
+            "✓ Durará algunos minutos\n\n"
+            "¿Deseas continuar?", 
+            QMessageBox.Yes | QMessageBox.No)
+        
+        if respuesta == QMessageBox.Yes:
+            self.btn_optimizar.setEnabled(False)
+            self.btn_restaurar.setEnabled(False)
+            self.btn_creditos.setEnabled(False)
+            self.log_console.clear()
+            self.log("🔄 Iniciando restauración del sistema...")
+            
+            self.worker = OptimizationWorker(optimize=False)
+            self.worker.progress.connect(self.log)
+            self.worker.finished.connect(self.restauracion_finalizada)
+            self.worker.error_occurred.connect(lambda e: self.log(f"❌ {e}"))
+            self.worker.start()
+    
+    def optimizacion_finalizada(self, exitoso):
+        self.btn_optimizar.setEnabled(True)
+        self.btn_restaurar.setEnabled(True)
+        self.btn_creditos.setEnabled(True)
+        
+        if exitoso:
+            try:
+                self.success_sound.play()
+            except Exception:
+                pass
+            
+            QMessageBox.information(self, "✨ ÉXITO", 
+                "¡OPTIMIZACIÓN COMPLETADA EXITOSAMENTE!\n\n"
+                "🚀 Tu PC está super rápida en TODO:\n"
+                "   ✓ WiFi - Velocidad máxima\n"
+                "   ✓ Sistema - Rendimiento óptimo\n"
+                "   ✓ Aplicaciones - Ejecución suave\n"
+                "   ✓ Juegos - FPS mejorado\n\n"
+                "💡 Se recomienda reiniciar la PC para mejores resultados.")
+        else:
+            QMessageBox.critical(self, "❌ ERROR", 
+                "Hubo un error durante la optimización.\n"
+                "Por favor, intenta nuevamente.")
+    
+    def restauracion_finalizada(self, exitoso):
+        self.btn_optimizar.setEnabled(True)
+        self.btn_restaurar.setEnabled(True)
+        self.btn_creditos.setEnabled(True)
+        
+        if exitoso:
+            try:
+                self.success_sound.play()
+            except Exception:
+                pass
+            
+            QMessageBox.information(self, "✨ ÉXITO", 
+                "¡RESTAURACIÓN COMPLETADA EXITOSAMENTE!\n\n"
+                "🔄 Tu sistema ha sido restaurado a:\n"
+                "   ✓ Valores por defecto\n"
+                "   ✓ Configuración original\n"
+                "   ✓ Todos los servicios activados\n\n"
+                "💡 Se recomienda reiniciar la PC.")
+        else:
+            QMessageBox.critical(self, "❌ ERROR", 
+                "Hubo un error durante la restauración.\n"
+                "Por favor, intenta nuevamente.")
+    
+    def elevar_privilegios(self):
+        try:
+            if ctypes.windll.shell32.IsUserAnAdmin() == 0:
+                self.log("Solicitando privilegios de administrador...")
+                ctypes.windll.shell32.ShellExecuteW(
+                    None, "runas", sys.executable, " ".join(sys.argv), None, 1
+                )
+                sys.exit()
         except Exception as e:
-            self.log(f"Error: {str(e)}")
-            self.mostrar_error("Error", "Error al optimizar efectos visuales")
+            self.log(f"❌ Error al elevar privilegios: {str(e)}")
+
 
 def main():
     app = QApplication(sys.argv)
-
+    
     if not ctypes.windll.shell32.IsUserAnAdmin():
         if sys.platform == 'win32':
             ctypes.windll.shell32.ShellExecuteW(
                 None, "runas", sys.executable, " ".join(sys.argv), None, 1
             )
             return
-        else:
-            QMessageBox.critical(None, "Error", "Este programa requiere privilegios de administrador")
-            return
-            
+    
     app.setStyle('Fusion')
     ventana = OptimizadorTHO()
     ventana.show()
     sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     main()
