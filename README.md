@@ -7,8 +7,6 @@
 [![YouTube Tutorial](https://img.shields.io/badge/YouTube-Tutorial-red?style=for-the-badge&logo=youtube)](https://www.youtube.com/@TODO-HACK-OFFICIAL)
 [![Discord](https://img.shields.io/badge/Discord-Unete-7289DA?style=for-the-badge&logo=discord)](https://discord.gg/4svwzsy3UP)
 
-<img src="vdo/v.gif" alt="THO Optimizer Demo" width="720">
-
 *Una potente herramienta de optimización para Windows*
 
 </div>
@@ -97,5 +95,6 @@ pip install -r requirements.txt
 - Asegúrate de tener todos los recursos (imágenes, iconos) en la carpeta `icons`
 - La compilación puede tardar unos minutos
 - El archivo ejecutable será independiente y no necesitará Python instalado
+
 
 
