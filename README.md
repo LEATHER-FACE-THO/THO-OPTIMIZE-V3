@@ -75,7 +75,7 @@
 1. Clonar el repositorio:
 ```bash
 git clone https://github.com/HANNIBAL-THO/THO-OPTIMIZE-V2
-cd THO-OPTIMIZER-V2
+cd THO-OPTIMIZER-V3
 ```
 
 2. Crear un entorno virtual:
@@ -91,31 +91,11 @@ pip install -r requirements.txt
 
 ## 🛠️ Compilación
 
-1. Asegúrate de tener todos los archivos necesarios:
-```bash
-dir
-```
-
-2. Instala PyInstaller si aún no lo tienes:
-```bash
-pip install pyinstaller
-```
-
-3. Compila el proyecto:
-```bash
-pyinstaller --noconfirm --onefile --windowed --icon=icons/icon.ico --add-data "icons;icons/" --name "THO-Optimizer" main.py
-```
-
-4. El ejecutable se encontrará en la carpeta `dist`:
-```bash
-cd dist
-THO-Optimizer.exe
-```
-
 ## 📝 Notas de Compilación
 
 - El ejecutable final estará en la carpeta `dist`
 - Asegúrate de tener todos los recursos (imágenes, iconos) en la carpeta `icons`
 - La compilación puede tardar unos minutos
 - El archivo ejecutable será independiente y no necesitará Python instalado
+
 
